@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Hearts</title>
+
+    <style>
+        ul {
+            display: flex;
+            gap: .25rem;
+        }
+
+        li {
+            --color: red;
+            --sec-color: lightgrey;
+
+            display: block;
+            background: var(--color);
+            width: 2rem;
+            height: 2rem;
+        }
+
+        li.f3-4 { background: linear-gradient(to right, var(--color) 75%, var(--sec-color) 75%) }
+        li.f2-4 { background: linear-gradient(to right, var(--color) 50%, var(--sec-color) 50%) }
+        li.f1-4 { background: linear-gradient(to right, var(--color) 25%, var(--sec-color) 25%) }
+        li.f0-4 { background: var(--sec-color) }
+
+        ul.poisoned li:not(.empty) { --color: purple }
+    </style>
+</head>
+<body>
+    <ul id="healthbar"></ul>
+    <button class="hit" onclick="hit(1)">Hit .25</button>
+    <button class="hit" onclick="hit(2)">Hit .5</button>
+    <button class="hit" onclick="hit(3)">Hit .75</button>
+    <button class="hit" onclick="hit(4)">Hit 1</button>
+</body>
+<script>
+    const day = 86400000; // milliseconds
+    // const day = 5000;
+
+    if (urlParams.has('clear')) {
+        localStorage.clear();
+        window.history.replaceState(null, '', window.location.pathname);
+    }
+
+    var storageKey = 'healthbarSaveData'
+    var storageData = JSON.parse(localStorage.getItem(storageKey));
+
+    if (!storageData) {
+        localStorage.setItem(storageKey, JSON.stringify({
+            'size': 10,
+            'fractions': 4,
+            'health': 10 * 4,
+            'poisoned': 0,
+            'start': null,
+            'hits': []
+        }));
+
+        storageData = JSON.parse(localStorage.getItem(storageKey));
+    }
+    else if (new Date(storageData.start) < new Date(Date.now() - 7 * day)) {
+        storageData.health = storageData.size * storageData.fractions;
+        storageData.poisoned = 0;
+        storageData.start = null;
+        storageData.hits = [];
+        localStorage.setItem(storageKey, JSON.stringify(storageData));
+    }
+
+    var size = storageData.size; // units
+    var fractions = storageData.fractions; // fractions
+    var health = storageData.health; // fractions
+    var poisoned = storageData.poisoned; // fractions
+    var maxHealth = size * fractions; // fractions
+    var poisonLimit = 3 * fractions; // fractions
+
+    var healthbar = document.getElementById('healthbar'); // units
+
+    renderHealthBar();
+    updateButtons();
+
+    function hit(power) {
+        storageData.start = storageData.start ? storageData.start : new Date();
+        storageData.hits.push({ 'time': new Date(), 'power': power }); // power in fractions
+        localStorage.setItem(storageKey, JSON.stringify(storageData));
+
+        renderHealthBar();
+        updateButtons();
+    }
+    
+    function renderHealthBar() {
+        while (healthbar.firstChild) healthbar.removeChild(healthbar.firstChild);
+
+        if (health > 0) calculateHealth();
+
+        if (poisoned) healthbar.classList.add('poisoned');
+        else healthbar.classList.remove('poisoned');
+
+        let last = Math.floor(health - health % fractions);
+        let lastClass = `f${health < 0 ? 0 : health % fractions}-${fractions}`;
+
+        for (let i = 0; i < maxHealth; i++) {
+            if (!(i % fractions)) {
+                let li = document.createElement('li');
+                if (i == last) li.classList.add(lastClass);
+                else if (i > last) li.classList.add(`f0-${fractions}`);
+                healthbar.appendChild(li);
+            }
+        }
+    }
+
+    function calculateHealth() {
+        let r = 0;
+        let d = 0;
+
+        for (let i = 0; i < storageData.hits.length; i++) {
+            if (new Date(storageData.hits[i].time) > new Date(Date.now() - day)) r += storageData.hits[i].power;
+            d += storageData.hits[i].power;
+        }
+
+        health = maxHealth - d;
+        poisoned = r > poisonLimit ? poisoned ? poisoned : health : 0;
+        health = health <= poisoned - 1 * fractions ? 0 : health;
+
+        storageData.health = health;
+        storageData.poisoned = poisoned;
+        localStorage.setItem(storageKey, JSON.stringify(storageData));
+    }
+
+    function updateButtons() {
+        let buttons = document.getElementsByClassName('hit');
+        for (let i = 0; i < buttons.length; i++) buttons[i].disabled = health <= 0;
+    }
+</script>
