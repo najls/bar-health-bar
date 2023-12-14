@@ -37,6 +37,7 @@
 <script>
     const day = 86400000; // milliseconds
     // const day = 5000;
+    const urlParams = new URLSearchParams(window.location.search);
 
     if (urlParams.has('clear')) {
         localStorage.clear();
